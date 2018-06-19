@@ -61,11 +61,11 @@ function end {
     echo 2>/dev/null
     echo "Ending tracing..." 2>/dev/null
     cd $tracing
-    warn "echo 0 > events/vmstat/mm_vmscan_direct_reclaim_begin/enable"
-    warn "echo 0 > events/vmstat/mm_vmscan_direct_reclaim_end/enable"
+    warn "echo 0 > events/vmscan/mm_vmscan_direct_reclaim_begin/enable"
+    warn "echo 0 > events/vmscan/mm_vmscan_direct_reclaim_end/enable"
     if (( opt_pid )); then
-        warn "echo 0 > events/vmstat/mm_vmscan_direct_reclaim_begin/filter"
-        warn "echo 0 > events/vmstat/mm_vmscan_direct_reclaim_end/filter"
+        warn "echo 0 > events/vmscan/mm_vmscan_direct_reclaim_begin/filter"
+        warn "echo 0 > events/vmscan/mm_vmscan_direct_reclaim_end/filter"
     fi
     warn "echo > trace"
     (( wroteflock )) && warn "rm $flock"
@@ -129,8 +129,8 @@ echo $$ > $flock || die "ERROR: unable to write $flock."
 echo nop > current_tracer
 warn "echo $bufsize_kb > buffer_size_kb"
 # TODO: support filter
-if ! echo 1 > events/vmstat/mm_vmscan_direct_reclaim_begin/enable || \
-    ! echo 1 > events/vmstat/mm_vmscan_direct_reclaim_end/enable; then
+if ! echo 1 > events/vmscan/mm_vmscan_direct_reclaim_begin/enable || \
+    ! echo 1 > events/vmscan/mm_vmscan_direct_reclaim_end/enable; then
     edie "ERROR: enabling block I/O tracepoints. Exiting."
 fi
 (( opt_start )) && printf "%-15s " "START"
