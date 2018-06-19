@@ -133,10 +133,10 @@ if ! echo 1 > events/vmscan/mm_vmscan_direct_reclaim_begin/enable || \
     ! echo 1 > events/vmscan/mm_vmscan_direct_reclaim_end/enable; then
     edie "ERROR: enabling block I/O tracepoints. Exiting."
 fi
+printf "%-12.12s %-6s" "COMM" "PID"
 (( opt_start )) && printf "%-15s " "START"
 (( opt_end )) && printf "%-15s " "END"
-printf "%-12.12s %-6s %-8s %20s \n" \
-    "COMM" "PID" "LATms" "PAGES"
+printf "%-8s %6s \n" "LATms" "PAGES"
 
 #
 # Determine output format. It may be one of the following (newest first):
@@ -174,7 +174,7 @@ fi ) | $awk -v o=$offset -v opt_name=$opt_name -v name=$name \
         if (opt_name && match(comm, name) == 0)
             next
         #
-        # example: TODO
+        # example: comm-pid [cpu] .... TIMESTAMP: mm_vmscan_direct_reclaim_begin:
         #
         starts[$1] = time
         comms[$1] = comm
@@ -185,22 +185,22 @@ fi ) | $awk -v o=$offset -v opt_name=$opt_name -v name=$name \
     # mm_vmscan_direct_reclaim_end
     $1 != "#" && $0 ~ /mm_vmscan_direct_reclaim_end/ {
         #
-        # example: TODO
+        # example: comm-pid [cpu] .... TIMESTAMP: mm_vmscan_direct_reclaim_end: nr_reclaimed=32
         #
 
         if (starts[$1] > 0) {
             latency = sprintf("%.2f",
                 1000 * (time - starts[$1]))
-            nr_reclaimed = $(5+o); sub("/.*=/", "", nr_reclaimed)
+            nr_reclaimed = $(5+o); sub(/.*=/, "", nr_reclaimed)
             comm = comms[$1]
             pid = pids[$1]
 
+            printf "%-12.12s %-6s", comm, pid
             if (opt_start)
                 printf "%-15s ", starts[$1]
             if (opt_end)
                 printf "%-15s ", time
-            printf "%-12.12s %-6s %-8s %20s \n",
-                comm, pid, latency, nr_reclaimed
+            printf "%-8s %6s \n", latency, nr_reclaimed
 
             if (!opt_duration)
                 fflush()
