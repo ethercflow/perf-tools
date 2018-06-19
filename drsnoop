@@ -135,7 +135,7 @@ if ! echo 1 > events/vmscan/mm_vmscan_direct_reclaim_begin/enable || \
 fi
 (( opt_start )) && printf "%-15s " "START"
 (( opt_end )) && printf "%-15s " "END"
-printf "%-12.12s %-6s %-8s %12.12s \n" \
+printf "%-12.12s %-6s %-8s %20s \n" \
     "COMM" "PID" "LATms" "PAGES"
 
 #
@@ -170,7 +170,7 @@ fi ) | $awk -v o=$offset -v opt_name=$opt_name -v name=$name \
     }
 
     # mm_vmscan_direct_reclaim_begin
-    $1 != "#" && $0 ~ mm_vmscan_direct_reclaim_begin {
+    $1 != "#" && $0 ~ /mm_vmscan_direct_reclaim_begin/ {
         if (opt_name && match(comm, name) == 0)
             next
         #
@@ -183,7 +183,7 @@ fi ) | $awk -v o=$offset -v opt_name=$opt_name -v name=$name \
     }
 
     # mm_vmscan_direct_reclaim_end
-    $1 != "#" && $0 ~ mm_vmscan_direct_reclaim_end {
+    $1 != "#" && $0 ~ /mm_vmscan_direct_reclaim_end/ {
         #
         # example: TODO
         #
@@ -199,7 +199,7 @@ fi ) | $awk -v o=$offset -v opt_name=$opt_name -v name=$name \
                 printf "%-15s ", starts[$1]
             if (opt_end)
                 printf "%-15s ", time
-            printf "%-12.12s %-6s %-8s %12.12s \n",
+            printf "%-12.12s %-6s %-8s %20s \n",
                 comm, pid, latency, nr_reclaimed
 
             if (!opt_duration)
