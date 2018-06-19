@@ -131,7 +131,7 @@ warn "echo $bufsize_kb > buffer_size_kb"
 # TODO: support filter
 if ! echo 1 > events/vmscan/mm_vmscan_direct_reclaim_begin/enable || \
     ! echo 1 > events/vmscan/mm_vmscan_direct_reclaim_end/enable; then
-    edie "ERROR: enabling block I/O tracepoints. Exiting."
+    edie "ERROR: enabling vmscan direct reclaim tracepoints. Exiting."
 fi
 printf "%-12.12s %-6s" "COMM" "PID"
 (( opt_start )) && printf "%-15s " "START"
