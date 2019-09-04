@@ -53,8 +53,10 @@
 # 12-Jul-2014	Brendan Gregg	Created this.
 
 ### default variables
-tracing=/sys/kernel/debug/tracing
-flock=/var/tmp/.ftrace-lock
+root=/sys/kernel/debug/tracing
+tracing=$root/instances/iosnoop
+mkdir $tracing
+#flock=/var/tmp/.ftrace-lock
 bufsize_kb=4096
 opt_duration=0; duration=; opt_name=0; name=; opt_pid=0; pid=; ftext=
 opt_start=0; opt_end=0; opt_device=0; device=; opt_iotype=0; iotype=
@@ -106,7 +108,8 @@ function end {
 		warn "echo 0 > events/block/block_rq_complete/filter"
 	fi
 	warn "echo > trace"
-	(( wroteflock )) && warn "rm $flock"
+	# (( wroteflock )) && warn "rm $flock"
+	rmdir $tracing
 }
 
 function die {
@@ -166,15 +169,15 @@ fi
 ### select awk
 (( opt_duration )) && use=mawk || use=gawk	# workaround for mawk fflush()
 [[ -x /usr/bin/$use ]] && awk=$use || awk=awk
-wroteflock=1
+# wroteflock=1
 
 ### check permissions
 cd $tracing || die "ERROR: accessing tracing. Root user? Kernel has FTRACE?
     debugfs mounted? (mount -t debugfs debugfs /sys/kernel/debug)"
 
 ### ftrace lock
-[[ -e $flock ]] && die "ERROR: ftrace may be in use by PID $(cat $flock) $flock"
-echo $$ > $flock || die "ERROR: unable to write $flock."
+# [[ -e $flock ]] && die "ERROR: ftrace may be in use by PID $(cat $flock) $flock"
+# echo $$ > $flock || die "ERROR: unable to write $flock."
 
 ### setup and begin tracing
 echo nop > current_tracer
