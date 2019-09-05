@@ -1,0 +1,175 @@
+#!/bin/bash
+
+root=/sys/kernel/debug/tracing
+tracing=$root/instances/readsnoop
+mkdir $tracing 
+bufsize_kb=409600
+opt_duration=0; duration=; opt_name=0; name=; opt_pid=0; pid=; ftext=
+opt_start=0; opt_end=0; 
+trap ':' INT QUIT TERM PIPE HUP    # sends execution to end tracing section
+
+function usage {
+    cat <<-END >&2
+    USAGE: readsnoop [-hst] [-n name]
+                   [duratrwn]
+                     -n name         # process name to match on pread issue
+                     -s              # include start time of read (s)
+                     -t              # include completrwn time of prad64 (s)
+                     -h              # this usage message
+                     duratrwn        # duratrwn seconds, and use buffers
+      eg,
+           readsnoop                   # watch read live (unbuffered)
+           readsnoop 1                 # trace 1 sec (buffered)
+           readsnoop -ts               # include start and end timestamps
+
+    See the man page and example file for more info.
+END
+    exit
+}
+
+function warn {
+    if ! eval "$@"; then
+        echo >&2 "WARNING: command failed \"$@\""
+    fi
+}
+
+function end {
+    # disable tracing
+    echo 2>/dev/null
+    echo "Ending tracing..." 2>/dev/null
+    cd $tracing
+    warn "echo 0 > events/syscalls/sys_enter_read/enable"
+    warn "echo 0 > events/syscalls/sys_exit_read/enable"
+    warn "echo > trace"
+    rmdir $tracing
+}
+
+function die {
+    echo >&2 "$@"
+    exit 1
+}
+
+function edie {
+    # die with a quiet end()
+    echo >&2 "$@"
+    exec >/dev/null 2>&1
+    end
+    exit 1
+}
+
+### process options
+while getopts d:ha:n:p:Qst opt
+do
+    case $opt in
+    n)    opt_name=1; name=$OPTARG ;;
+    p)    opt_pid=1; pid=$OPTARG ;;
+    s)    opt_start=1 ;;
+    t)    opt_end=1 ;;
+    h|?)    usage ;;
+    esac
+done
+shift $(( $OPTIND - 1 ))
+if (( $# )); then
+    opt_duration=1
+    duration=$1
+    shift
+fi
+
+### select awk
+(( opt_duration )) && use=mawk || use=gawk    # workaround for mawk fflush()
+[[ -x /usr/bin/$use ]] && awk=$use || awk=awk
+wroteflock=1
+
+### check permissions
+cd $tracing || die "ERROR: accessing tracing. Root user? Kernel has FTRACE?
+    debugfs mounted? (mount -t debugfs debugfs /sys/kernel/debug)"
+
+### setup and begin tracing
+echo nop > current_tracer
+warn "echo $bufsize_kb > buffer_size_kb"
+
+if ! echo 1 > events/syscalls/sys_enter_read/enable || \
+    ! echo 1 > events/syscalls/sys_exit_read/enable; then
+    edie "ERROR: enabling block I/O tracepoints. Exiting."
+fi
+(( opt_start )) && printf "%-15s " "STARTs"
+(( opt_end )) && printf "%-15s " "ENDs"
+printf "%-12.12s %-6s %-4s %-6s %8s\n" \
+    "COMM" "PID" "FD" "BYTES" "LATms"
+
+#
+# Determine output format. It may be one of the following (newest first):
+#           TASK-PID   CPU#  ||||    TIMESTAMP  FUNCTION
+#           TASK-PID    CPU#    TIMESTAMP  FUNCTION
+# To differentiate between them, the number of header fields is counted,
+# and an offset set, to skip the extra column when needed.
+#
+offset=$($awk 'BEGIN { o = 0; }
+    $1 == "#" && $2 ~ /TASK/ && NF == 6 { o = 1; }
+    $2 ~ /TASK/ { print o; exit }' trace)
+
+### print trace buffer
+warn "echo > trace"
+( if (( opt_duration )); then
+    # wait then dump buffer
+    sleep $duration
+    cat trace
+else
+    # print buffer live
+    cat trace_pipe
+fi ) | $awk -v o=$offset -v opt_name=$opt_name -v name=$name \
+    -v opt_duration=$opt_duration -v opt_start=$opt_start -v opt_end=$opt_end '
+    # common fields
+    $1 != "#" {
+        # task name can contain dashes
+        comm = pid = $1
+        sub(/-[0-9][0-9]*/, "", comm)
+        sub(/.*-/, "", pid)
+        time = $(3+o); sub(":", "", time)
+    }
+
+    # enter pread 
+    $1 != "#" && $0 ~ /sys_read/ && $(5+o) !~ /->/ {
+       if (opt_name && match(comm, name) == 0)
+          next
+
+       count = $(NF)
+       sub(/,$/, "", count)
+       count = strtonum("0x"count)
+       fd=$(5+o)
+       sub(/\)$/, "", fd)
+       fd = strtonum("0x"fd)
+       starts[$1] = time
+       counts[$1] = count
+       fds[$1] = fd
+    }
+
+   # exit pread
+   $1 != "#" && $0 ~ /->/ {
+      if (starts[$1] > 0) {
+         latency_ms = 1000 * (time - starts[$1])
+          if (opt_start)
+             printf "%-15s ", starts[$1]
+          if (opt_end)
+             printf "%-15s ", time
+
+          fd = fds[$1]
+          count = counts[$1]
+
+          printf "%-12.12s %-6s %-4s %-6s %8s\n",
+              comm, pid, fd, count, latency_ms
+          if (!opt_duration)
+             fflush()
+
+          delete starts[$1]
+          delete counts[$1]
+          delete fds[$1]
+      }
+      next
+   }
+
+   $0 ~ /LOST.*EVENTS/ { print "WARNING: " $0 > "/dev/stderr" }
+'
+
+### end tracing
+end
