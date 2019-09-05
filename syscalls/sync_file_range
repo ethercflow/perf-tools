@@ -94,7 +94,7 @@ if ! echo 1 > events/syscalls/sys_enter_sync_file_range/enable || \
 fi
 (( opt_start )) && printf "%-15s " "STARTs"
 (( opt_end )) && printf "%-15s " "ENDs"
-printf "%-12.12s %-6s %-4s %-6s %-6s %-4s %8s\n" \
+printf "%-12.12s %-6s %-4s %-12s %-12s %-4s %8s\n" \
     "COMM" "PID" "FD" "OFFSET" "BYTES" "FLAGS" "LATms"
 
 #
@@ -166,7 +166,7 @@ fi ) | $awk -v o=$offset -v opt_name=$opt_name -v name=$name \
           nbytes = nbyteses[$1]
           flags = flagses[$1]
 
-          printf "%-12.12s %-6s %-4s %-6s %-6s %-4s %8s\n",
+          printf "%-12.12s %-6s %-4s %-12s %-12s %-4s %8s\n",
               comm, pid, fd, offset, nbytes, flags, latency_ms
           if (!opt_duration)
              fflush()
