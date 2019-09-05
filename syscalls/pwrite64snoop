@@ -94,8 +94,8 @@ if ! echo 1 > events/syscalls/sys_enter_pwrite64/enable || \
 fi
 (( opt_start )) && printf "%-15s " "STARTs"
 (( opt_end )) && printf "%-15s " "ENDs"
-printf "%-12.12s %-6s %-4s  %-6s %8s\n" \
-    "COMM" "PID" "FD" "BYTES" "LATms"
+printf "%-12.12s %-6s %-4s %-6s %-6s %8s\n" \
+    "COMM" "PID" "FD" "BYTES" "OFFSET" "LATms"
 
 #
 # Determine output format. It may be one of the following (newest first):
@@ -135,11 +135,16 @@ fi ) | $awk -v o=$offset -v opt_name=$opt_name -v name=$name \
 
        count = $(NF-2)
        sub(/,$/, "", count)
+       count = strtonum("0x"count)
+       pos = $(NF)
+       sub(/\)$/, "", fd)
+       pos = strtonum("0x"pos)
        fd=$(5+o)
        sub(/\)$/, "", fd)
        fd = strtonum("0x"fd)
        starts[$1] = time
        counts[$1] = count
+       poses[$1] = pos
        fds[$1] = fd
     }
 
@@ -154,14 +159,16 @@ fi ) | $awk -v o=$offset -v opt_name=$opt_name -v name=$name \
 
           fd = fds[$1]
           count = counts[$1]
+          pos = poses[$1]
 
-          printf "%-12.12s %-6s %-4s %-6s %8s\n",
-              comm, pid, fd, count, latency_ms
+          printf "%-12.12s %-6s %-4s %-6s %-6s %8s\n",
+              comm, pid, fd, count, pos, latency_ms
           if (!opt_duration)
              fflush()
 
           delete starts[$1]
           delete counts[$1]
+          delete poses[$1]
           delete fds[$1]
       }
       next
